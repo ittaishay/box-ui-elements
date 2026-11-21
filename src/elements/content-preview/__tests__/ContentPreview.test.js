@@ -1112,6 +1112,81 @@ describe('elements/content-preview/ContentPreview', () => {
 
             jest.useRealTimers();
         });
+
+        test('preserves defer timeout when fetchFileSuccessCallback triggers destroyPreview(false) before delay elapses', () => {
+            jest.useFakeTimers();
+            const wrapper = getWrapper({
+                token: 'token',
+                fileId: '123',
+                loadingIndicatorDelayMs: 300,
+            });
+            const instance = wrapper.instance();
+
+            jest.advanceTimersByTime(100);
+            instance.fetchFileSuccessCallback({
+                id: '123',
+                extension: 'pptx',
+                file_version: { id: 'v1', sha1: 'sha' },
+            });
+            wrapper.update();
+
+            expect(wrapper.state('isLoading')).toBe(true);
+            expect(wrapper.state('isLoadingDeferred')).toBe(true);
+            expect(instance.loadingIndicatorDelayTimeoutId).not.toBeNull();
+            expect(wrapper.find(PreviewMask).prop('isLoadingDeferred')).toBe(true);
+
+            jest.advanceTimersByTime(200);
+            wrapper.update();
+
+            expect(wrapper.state('isLoading')).toBe(true);
+            expect(wrapper.state('isLoadingDeferred')).toBe(false);
+            expect(instance.loadingWasDeferred).toBe(true);
+            expect(instance.loadingIndicatorDelayTimeoutId).toBeNull();
+            expect(wrapper.find(PreviewMask).prop('isLoading')).toBe(true);
+            expect(wrapper.find(PreviewMask).prop('isLoadingDeferred')).toBe(false);
+
+            jest.useRealTimers();
+        });
+
+        test('does not defer loading indicator on watermarked file reload after initial loading session ended', () => {
+            jest.useFakeTimers();
+            global.Box.Preview = function Preview() {
+                this.updateFileCache = jest.fn();
+                this.show = jest.fn();
+                this.addListener = jest.fn();
+                this.destroy = jest.fn();
+                this.removeAllListeners = jest.fn();
+            };
+            const wrapper = getWrapper({
+                token: 'token',
+                fileId: '123',
+                loadingIndicatorDelayMs: 300,
+            });
+            const instance = wrapper.instance();
+            const initialFile = {
+                id: '123',
+                extension: 'pptx',
+                file_version: { id: 'v1', sha1: 'sha1' },
+                watermark_info: { is_watermarked: true },
+            };
+
+            instance.fetchFileSuccessCallback(initialFile);
+            instance.endLoadingSession();
+
+            expect(instance.loadingIndicatorDelayTimeoutId).toBeNull();
+            expect(wrapper.state('isLoading')).toBe(false);
+
+            const updatedWatermarkedFile = {
+                ...initialFile,
+                file_version: { id: 'v2', sha1: 'sha2' },
+            };
+            instance.fetchFileSuccessCallback(updatedWatermarkedFile);
+
+            expect(wrapper.state('isLoading')).toBe(true);
+            expect(wrapper.state('isLoadingDeferred')).toBe(false);
+
+            jest.useRealTimers();
+        });
     });
 
     describe('fetchFileErrorCallback()', () => {

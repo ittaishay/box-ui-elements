@@ -451,7 +451,9 @@ class ContentPreview extends React.PureComponent<Props, State> {
      * Cleans up the preview instance.
      */
     destroyPreview(shouldReset: boolean = true) {
-        this.clearLoadingIndicatorDelayTimeout();
+        if (shouldReset) {
+            this.clearLoadingIndicatorDelayTimeout();
+        }
         const { onPreviewDestroy } = this.props;
         if (this.preview) {
             this.preview.destroy();
@@ -1266,7 +1268,10 @@ class ContentPreview extends React.PureComponent<Props, State> {
         // If the file is watermarked or if its a new file, then update the state
         // In this case preview should reload without prompting the user
         if (isWatermarked || !isExistingFile) {
-            const isDeferred = this.props.loadingIndicatorDelayMs && !this.loadingWasDeferred;
+            const isDeferred =
+                this.props.loadingIndicatorDelayMs &&
+                this.loadingIndicatorDelayTimeoutId != null &&
+                !this.loadingWasDeferred;
             this.setState({
                 ...this.initialState,
                 file,
